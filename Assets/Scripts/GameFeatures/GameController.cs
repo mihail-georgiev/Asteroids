@@ -1,67 +1,48 @@
 using UnityEngine;
 using System.Collections;
 using Entitas;
+using Entitas.Unity.VisualDebugging;
 using System.Collections.Generic;
 using System;
-using Entitas.Unity.VisualProfilingTool;
 
 public class GameController : MonoBehaviour {
-	Pool _pool;
-	IStartSystem[] _startSystems;
-	IExecuteSystem[] _executeSystems;
+    Systems _systems;
 	
 	[HideInInspector]
 	public bool runSystems = true;
 	
 	void Start () {
-		#if (UNITY_EDITOR)
-		_pool = new DebugPool(ComponentIds.TotalComponents);
-		#else
-		_pool = new Pool(ComponentIds.TotalComponents);
-		#endif
-		
-		createStartSystems();
-		startSystems();
-		createExecuteSystems();
-	}
-	
-	void createStartSystems () {
-		_startSystems = new [] {
-			_pool.CreateStartSystem<InitGameSystem>(),
-		};
-	}
-	
-	void createExecuteSystems () {
-		_executeSystems = new []{
-			_pool.CreateExecuteSystem<PlayerInputSystem>(),
-			_pool.CreateExecuteSystem<PlayerMoveSystem>(),
-			_pool.CreateExecuteSystem<SpawnAsteroidsSystem>(),
-			_pool.CreateExecuteSystem<HitDetectionSystem>(),
-			_pool.CreateExecuteSystem<ScoreSystem>(),
-			_pool.CreateExecuteSystem<AsteroidMoveSystem>(),
-			_pool.CreateExecuteSystem<BulletMoveSystem>(),
-			_pool.CreateExecuteSystem<RenderPositionSystem>(),
-			_pool.CreateExecuteSystem<DestroyAsteroidsSystem>(),
-			_pool.CreateExecuteSystem<DestroyBulletSystem>(),
-			_pool.CreateExecuteSystem<StopGameSystem>()
-		};
-	}
-	
-	void startSystems () {
-		foreach (var system in _startSystems) {
-			system.Start();
-		}
+		_systems = createSystems(Pools.pool);
+		_systems.Start();
 	}
 	
 	void Update () {
 		if(runSystems){
-			foreach (var system in _executeSystems) {
-				system.Execute();
-			}
+			_systems.Execute();	
 		}
 	}
-	
-	void OnApplicationQuit() {
-		LogWriter.Instance.CloseLog();
+	Systems createSystems(Pool pool) {
+//		#if (UNITY_EDITOR)
+//		return new DebugSystems()
+//			#else
+			return new Systems()
+//				#endif
+				
+				// Initialize
+				.Add(pool.CreateSystem<InitGameSystem>())
+				
+				// Input
+				.Add(pool.CreateSystem<PlayerInputSystem>())
+				.Add(pool.CreateSystem<PlayerMoveSystem>())
+				.Add(pool.CreateSystem<SpawnAsteroidsSystem>())
+				.Add(pool.CreateSystem<HitDetectionSystem>())
+				.Add(pool.CreateSystem<ScoreSystem>())
+				.Add(pool.CreateSystem<AsteroidMoveSystem>())
+				.Add(pool.CreateSystem<BulletMoveSystem>())
+				.Add(pool.CreateSystem<RenderPositionSystem>())
+				.Add(pool.CreateSystem<DestroyAsteroidsSystem>())
+				.Add(pool.CreateSystem<DestroyBulletSystem>())
+				.Add(pool.CreateSystem<StopGameSystem>());
 	}
+
 }

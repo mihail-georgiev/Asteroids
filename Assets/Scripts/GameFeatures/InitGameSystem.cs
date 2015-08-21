@@ -12,6 +12,7 @@ public class InitGameSystem : IStartSystem, ISetPool {
 		var playerEntity = _pool.CreateEntity();
 		playerEntity.isPlayer = true;
 		GameObject player = GameObject.Instantiate(Resources.Load<GameObject>("Prefabs/Player"));
+		if(player == null) Debug.Log("tuka e mammka mu");
 		playerEntity.AddGameObject(player);
 		playerEntity.AddPlayerSpeed(0f,0f);
 		playerEntity.AddPosition(-55f,0f);

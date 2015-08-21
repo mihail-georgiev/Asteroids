@@ -2,16 +2,13 @@
 using UnityEngine;
 
 public class HitDetectionSystem : IExecuteSystem, ISetPool {
-	Entity _player, _score;
 	Group _asteroids;
 	Group _bullets;
 	Pool _pool;
 	
 	public void SetPool(Pool pool) {
-		_player = pool.playerEntity;
 		_asteroids = pool.GetGroup(Matcher.AllOf(Matcher.Asteroid));
 		_bullets = pool.GetGroup (Matcher.AllOf(Matcher.Bullet));
-		_score = pool.scoreEntity;
 		_pool = pool;
 	}
 	
@@ -24,7 +21,7 @@ public class HitDetectionSystem : IExecuteSystem, ISetPool {
 		foreach(var asteroid in _asteroids.GetEntities()){
 			foreach (var bullet in _bullets.GetEntities()){
 				if(checkForHitWithBullet(bullet.position, asteroid.position)){
-					_score.ReplaceScore(_score.score.score + 10);
+					_pool.scoreEntity.ReplaceScore(_pool.scoreEntity.score.score + 10);
 					bullet.isDestroyBullet = true;
 					asteroid.isDestroyAsteroid = true;
 				}
@@ -35,7 +32,7 @@ public class HitDetectionSystem : IExecuteSystem, ISetPool {
 	void checkForAsteroidHittingPlayer ()
 	{
 		foreach (var asteroid in _asteroids.GetEntities ()) {
-			if (checkForHitWithPlayer (_player.position, asteroid.position)) {
+			if (checkForHitWithPlayer (_pool.playerEntity.position, asteroid.position)) {
 				Entity stopGameEntity = _pool.CreateEntity();
 				stopGameEntity.isStopGame = true;
 			}

@@ -3,6 +3,15 @@ using System.Collections.Generic;
 
 namespace Entitas {
     public partial class Pool {
+
+        public event PoolChanged OnEntityCreated;
+        public event PoolChanged OnEntityWillBeDestroyed;
+        public event PoolChanged OnEntityDestroyed;
+        public event GroupChanged OnGroupCreated;
+
+        public delegate void PoolChanged(Pool pool, Entity entity);
+        public delegate void GroupChanged(Pool pool, Group group);
+
         public int totalComponents { get { return _totalComponents; } }
         public int Count { get { return _entities.Count; } }
         public int pooledEntitiesCount { get { return _entityPool.Count; } }
@@ -10,7 +19,7 @@ namespace Entitas {
         protected readonly HashSet<Entity> _entities = new HashSet<Entity>(EntityEqualityComparer.comparer);
         protected readonly Dictionary<IMatcher, Group> _groups = new Dictionary<IMatcher, Group>();
         protected readonly List<Group>[] _groupsForIndex;
-        readonly ObjectPool _entityPool;
+        readonly Stack<Entity> _entityPool = new Stack<Entity>();
         readonly int _totalComponents;
         int _creationIndex;
         Entity[] _entitiesCache;
@@ -22,34 +31,50 @@ namespace Entitas {
             _totalComponents = totalComponents;
             _creationIndex = startCreationIndex;
             _groupsForIndex = new List<Group>[totalComponents];
-            _entityPool = new ObjectPool(createEntity);
-        }
-
-        Entity createEntity() {
-            return new Entity(_totalComponents);
+            _entityPool = new Stack<Entity>();
         }
 
         public virtual Entity CreateEntity() {
-            var entity = _entityPool.Get();
+            var entity = _entityPool.Count > 0 ? _entityPool.Pop() : new Entity(_totalComponents);
+            entity._isEnabled = true;
             entity._creationIndex = _creationIndex++;
             _entities.Add(entity);
             _entitiesCache = null;
-            entity.OnComponentAdded += onComponentAddedOrRemoved;
-            entity.OnComponentReplaced += onComponentReplaced;
-            entity.OnComponentWillBeRemoved += onComponentWillBeRemoved;
-            entity.OnComponentRemoved += onComponentAddedOrRemoved;
+            entity.OnComponentAdded += updateGroupsComponentAddedOrRemoved;
+            entity.OnComponentReplaced += updateGroupsComponentReplaced;
+            entity.OnComponentRemoved += updateGroupsComponentAddedOrRemoved;
+
+            if (OnEntityCreated != null) {
+                OnEntityCreated(this, entity);
+            }
+
             return entity;
         }
 
         public virtual void DestroyEntity(Entity entity) {
-            entity.RemoveAllComponents();
-            entity.OnComponentAdded -= onComponentAddedOrRemoved;
-            entity.OnComponentReplaced -= onComponentReplaced;
-            entity.OnComponentWillBeRemoved -= onComponentWillBeRemoved;
-            entity.OnComponentRemoved -= onComponentAddedOrRemoved;
-            _entities.Remove(entity);
+            var removed = _entities.Remove(entity);
+            if (!removed) {
+                throw new PoolDoesNotContainEntityException(entity,
+                    "Could not destroy entity!");
+            }
             _entitiesCache = null;
+
+            updateGroupsEntityWillBeDestroyed(entity);
+            if (OnEntityWillBeDestroyed != null) {
+                OnEntityWillBeDestroyed(this, entity);
+            }
+
+            entity.OnComponentAdded -= updateGroupsComponentAddedOrRemoved;
+            entity.OnComponentReplaced -= updateGroupsComponentReplaced;
+            entity.OnComponentRemoved -= updateGroupsComponentAddedOrRemoved;
+            entity.RemoveAllComponents();
+
+            entity._isEnabled = false;
             _entityPool.Push(entity);
+
+            if (OnEntityDestroyed != null) {
+                OnEntityDestroyed(this, entity);
+            }
         }
 
         public virtual void DestroyAllEntities() {
@@ -89,61 +114,49 @@ namespace Entitas {
                     }
                     _groupsForIndex[index].Add(group);
                 }
+
+                if (OnGroupCreated != null) {
+                    OnGroupCreated(this, group);
+                }
             }
 
             return group;
         }
 
-        protected void onComponentAddedOrRemoved(Entity entity, int index, IComponent component) {
+        protected void updateGroupsComponentAddedOrRemoved(Entity entity, int index, IComponent component) {
             var groups = _groupsForIndex[index];
             if (groups != null) {
                 for (int i = 0, groupsCount = groups.Count; i < groupsCount; i++) {
-                    groups[i].HandleEntity(entity);
+                    groups[i].HandleEntity(entity, index, component);
                 }
             }
         }
 
-        protected void onComponentReplaced(Entity entity, int index, IComponent component) {
+        protected void updateGroupsComponentReplaced(Entity entity, int index, IComponent previousComponent, IComponent newComponent) {
             var groups = _groupsForIndex[index];
             if (groups != null) {
                 for (int i = 0, groupsCount = groups.Count; i < groupsCount; i++) {
-                    groups[i].UpdateEntity(entity);
+                    groups[i].UpdateEntity(entity, index, previousComponent, newComponent);
                 }
             }
         }
 
-        protected void onComponentWillBeRemoved(Entity entity, int index, IComponent component) {
-            var groups = _groupsForIndex[index];
-            if (groups != null) {
-                for (int i = 0, groupsCount = groups.Count; i < groupsCount; i++) {
-                    var group = groups[i];
-                    entity._components[index] = null;
-                    var matches = group.matcher.Matches(entity);
-                    entity._components[index] = component;
-                    if (!matches) {
-                        group.WillRemoveEntity(entity);
+        void updateGroupsEntityWillBeDestroyed(Entity entity) {
+            for (int i = 0, groupsForIndexLength = _groupsForIndex.Length; i < groupsForIndexLength; i++) {
+                var groups = _groupsForIndex[i];
+                if (groups != null) {
+                    for (int j = 0, groupsCount = groups.Count; j < groupsCount; j++) {
+                        var group = groups[j];
+                        group.EntityWillBeDestroyed(entity);
                     }
                 }
             }
         }
     }
 
-    class ObjectPool {
-        public int Count { get { return _pool.Count; } }
-
-        readonly Func<Entity> _factoryMethod;
-        readonly Stack<Entity> _pool = new Stack<Entity>();
-
-        public ObjectPool(Func<Entity> factoryMethod) {
-            _factoryMethod = factoryMethod;
-        }
-
-        public Entity Get() {
-            return _pool.Count > 0 ? _pool.Pop() : _factoryMethod();
-        }
-
-        public void Push(Entity entity) {
-            _pool.Push(entity);
+    public class PoolDoesNotContainEntityException : Exception {
+        public PoolDoesNotContainEntityException(Entity entity, string message) :
+            base(message + "\nPool does not contain entity " + entity) {
         }
     }
 }

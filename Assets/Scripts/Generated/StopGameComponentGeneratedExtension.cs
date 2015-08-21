@@ -14,6 +14,11 @@ namespace Entitas {
                 }
             }
         }
+
+        public Entity IsStopGame(bool value) {
+            isStopGame = value;
+            return this;
+        }
     }
 
     public partial class Pool {

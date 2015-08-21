@@ -1,10 +1,7 @@
 ﻿namespace Entitas {
-    public interface IReactiveSystem : ISystem {
-        IMatcher GetTriggeringMatcher();
-
-        GroupEventType GetEventType();
-
-        void Execute(Entity[] entities);
+    public interface IReactiveSystem : IReactiveExecuteSystem {
+        IMatcher trigger { get; }
+        GroupEventType eventType { get; }
     }
 }
 

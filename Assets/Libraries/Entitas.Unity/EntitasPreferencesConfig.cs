@@ -17,12 +17,13 @@
         }
 
         public string GetValueOrDefault(string key, string defaultValue) {
-            if (_properties.ContainsKey(key)) {
+            key = key.Trim();
+            if (_properties.HasKey(key)) {
                 return _properties[key];
             }
 
             _properties[key] = defaultValue;
-            return defaultValue;
+            return _properties[key];
         }
     }
 }

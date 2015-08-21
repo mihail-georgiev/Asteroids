@@ -14,6 +14,11 @@ namespace Entitas {
                 }
             }
         }
+
+        public Entity IsDestroyAsteroid(bool value) {
+            isDestroyAsteroid = value;
+            return this;
+        }
     }
 
     public partial class Matcher {

@@ -1,35 +1,41 @@
+using System.Collections.Generic;
+
 namespace Entitas {
     public partial class Entity {
         public PlayerSpeedComponent playerSpeed { get { return (PlayerSpeedComponent)GetComponent(ComponentIds.PlayerSpeed); } }
 
         public bool hasPlayerSpeed { get { return HasComponent(ComponentIds.PlayerSpeed); } }
 
-        public void AddPlayerSpeed(PlayerSpeedComponent component) {
-            AddComponent(ComponentIds.PlayerSpeed, component);
+        static readonly Stack<PlayerSpeedComponent> _playerSpeedComponentPool = new Stack<PlayerSpeedComponent>();
+
+        public static void ClearPlayerSpeedComponentPool() {
+            _playerSpeedComponentPool.Clear();
         }
 
-        public void AddPlayerSpeed(float newSpeedX, float newSpeedY) {
-            var component = new PlayerSpeedComponent();
+        public Entity AddPlayerSpeed(float newSpeedX, float newSpeedY) {
+            var component = _playerSpeedComponentPool.Count > 0 ? _playerSpeedComponentPool.Pop() : new PlayerSpeedComponent();
             component.speedX = newSpeedX;
             component.speedY = newSpeedY;
-            AddPlayerSpeed(component);
+            return AddComponent(ComponentIds.PlayerSpeed, component);
         }
 
-        public void ReplacePlayerSpeed(float newSpeedX, float newSpeedY) {
-            PlayerSpeedComponent component;
-            if (hasPlayerSpeed) {
-                WillRemoveComponent(ComponentIds.PlayerSpeed);
-                component = playerSpeed;
-            } else {
-                component = new PlayerSpeedComponent();
-            }
+        public Entity ReplacePlayerSpeed(float newSpeedX, float newSpeedY) {
+            var previousComponent = hasPlayerSpeed ? playerSpeed : null;
+            var component = _playerSpeedComponentPool.Count > 0 ? _playerSpeedComponentPool.Pop() : new PlayerSpeedComponent();
             component.speedX = newSpeedX;
             component.speedY = newSpeedY;
             ReplaceComponent(ComponentIds.PlayerSpeed, component);
+            if (previousComponent != null) {
+                _playerSpeedComponentPool.Push(previousComponent);
+            }
+            return this;
         }
 
-        public void RemovePlayerSpeed() {
+        public Entity RemovePlayerSpeed() {
+            var component = playerSpeed;
             RemoveComponent(ComponentIds.PlayerSpeed);
+            _playerSpeedComponentPool.Push(component);
+            return this;
         }
     }
 

@@ -6,22 +6,41 @@ using System.Linq;
 namespace Entitas.CodeGenerator {
     public static class CodeGenerator {
         public const string componentSuffix = "Component";
+        public const string defaultIndicesLookupTag = "ComponentIds";
 
-        public static void Generate(Type[] types, string[] poolNames, string dir) {
-            if (!Directory.Exists(dir)) {
-                Directory.CreateDirectory(dir);
+        public static void Generate(Type[] types, string[] poolNames, string dir, ICodeGenerator[] codeGenerators) {
+            dir = GetSafeDir(dir);
+            CleanDir(dir);
+            
+            foreach (var generator in codeGenerators.OfType<IPoolCodeGenerator>()) {
+                writeFiles(dir, generator.Generate(poolNames));
             }
 
-            CleanDir(dir);
             var components = GetComponents(types);
-            generateIndicesLookup(dir, components);
-            generateComponentExtensions(dir, components);
-            generatePoolAttributes(dir, poolNames);
+            foreach (var generator in codeGenerators.OfType<IComponentCodeGenerator>()) {
+                writeFiles(dir, generator.Generate(components));
+            }
+
+            var systems = GetSystems(types);
+            foreach (var generator in codeGenerators.OfType<ISystemCodeGenerator>()) {
+                writeFiles(dir, generator.Generate(systems));
+            }
+        }
+
+        public static string GetSafeDir(string dir) {
+            if (!dir.EndsWith("/", StringComparison.Ordinal)) {
+                dir += "/";
+            }
+            if (!dir.EndsWith("Generated/", StringComparison.Ordinal)) {
+                dir += "Generated/";
+            }
+            return dir;
         }
 
         public static void CleanDir(string dir) {
+            dir = GetSafeDir(dir);
             if (Directory.Exists(dir)) {
-                FileInfo[] files = new DirectoryInfo(dir).GetFiles("*.cs");
+                FileInfo[] files = new DirectoryInfo(dir).GetFiles("*.cs", SearchOption.AllDirectories);
                 foreach (var file in files) {
                     try {
                         File.Delete(file.FullName);
@@ -29,38 +48,32 @@ namespace Entitas.CodeGenerator {
                         Console.WriteLine("Could not delete file " + file);
                     }
                 }
+            } else {
+                Directory.CreateDirectory(dir);
             }
         }
 
-        public static Type[]GetComponents(Type[] types) {
+        public static Type[] GetComponents(Type[] types) {
             return types
                 .Where(type => type.GetInterfaces().Contains(typeof(IComponent)))
                 .ToArray();
         }
 
-        static void generateIndicesLookup(string dir, Type[] components) {
-            var lookups = IndicesLookupGenerator
-                .GenerateIndicesLookup(components);
-            writeFiles(dir, lookups);
+        public static Type[] GetSystems(Type[] types) {
+            return types
+                .Where(type => !type.IsInterface
+                    && type != typeof(ReactiveSystem)
+                    && type != typeof(Systems)
+                    && type.GetInterfaces().Contains(typeof(ISystem)))
+                .ToArray();
         }
 
-        static void generateComponentExtensions(string dir, Type[] components) {
-            var extensions = ComponentExtensionsGenerator
-                .GenerateComponentExtensions(components, "GeneratedExtension");
-            writeFiles(dir, extensions);
-        }
-
-        static void generatePoolAttributes(string dir, string[] poolNames) {
-            var poolAttributes = PoolAttributeGenerator
-                .GeneratePoolAttributes(poolNames);
-            writeFiles(dir, poolAttributes);
-        }
-
-        static void writeFiles(string dir, Dictionary<string, string> files) {
-            foreach (var entry in files) {
-                var filePath = dir + entry.Key + ".cs";
-                var code = entry.Value;
-                File.WriteAllText(filePath, code);
+        static void writeFiles(string dir, CodeGenFile[] files) {
+            if (!Directory.Exists(dir)) {
+                Directory.CreateDirectory(dir);
+            }
+            foreach (var file in files) {
+                File.WriteAllText(dir + file.fileName + ".cs", file.fileContent.Replace("\n", Environment.NewLine));
             }
         }
     }
@@ -75,20 +88,29 @@ namespace Entitas.CodeGenerator {
             return type.Name;
         }
 
-        public static string PoolName(this Type type) {
-            Attribute[] attrs = Attribute.GetCustomAttributes(type);
-            foreach (Attribute attr in attrs) {
-                var customPool = attr as PoolAttribute;
-                if (customPool != null) {
-                    return customPool.tag;
-                }
-            }
+        public static string[] PoolNames(this Type type) {
+            return Attribute.GetCustomAttributes(type)
+                .Aggregate(new List<string>(), (poolNames, attr) => {
+                    var poolAttribute = attr as PoolAttribute;
+                    if (poolAttribute != null) {
+                        poolNames.Add(poolAttribute.tag);
+                    }
 
-            return string.Empty;
+                    return poolNames;
+                })
+                .OrderBy(poolName => poolName)
+                .ToArray();
         }
 
-        public static string IndicesLookupTag(this Type type) {
-            return type.PoolName() + "ComponentIds";
+        public static string[] IndicesLookupTags(this Type type) {
+            var poolNames = type.PoolNames();
+            if (poolNames.Length == 0) {
+                return new [] { CodeGenerator.defaultIndicesLookupTag };
+            }
+
+            return poolNames
+                .Select(poolName => poolName + CodeGenerator.defaultIndicesLookupTag)
+                .ToArray();
         }
 
         public static string UppercaseFirst(this string str) {

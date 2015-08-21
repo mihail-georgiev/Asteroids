@@ -2,16 +2,15 @@
 using UnityEngine;
 
 public class PlayerInputSystem : IExecuteSystem, ISetPool {
-	Entity _player;
 	Pool _pool;
 
 	public void SetPool(Pool pool) {
-		_player = pool.playerEntity;
 		_pool = pool;
 	}
 	
 	public void Execute() {	
-		Vector2 previousSpeed = new Vector2(_player.playerSpeed.speedX, _player.playerSpeed.speedY);
+		var playerEntity = _pool.playerEntity;
+		Vector2 previousSpeed = new Vector2(playerEntity.playerSpeed.speedX, playerEntity.playerSpeed.speedY);
 		Vector2 newSpeed = Vector2.zero;
 		if(Input.GetKey(KeyCode.UpArrow))
 		{
@@ -31,15 +30,13 @@ public class PlayerInputSystem : IExecuteSystem, ISetPool {
 		}
 
 		if(newSpeed != Vector2.zero || previousSpeed!= newSpeed)
-			_player.ReplacePlayerSpeed(newSpeed.x,newSpeed.y);
+			playerEntity.ReplacePlayerSpeed(newSpeed.x,newSpeed.y);
 
 		if (Input.GetKeyDown (KeyCode.Space))
-			shoot();
+			shoot(playerEntity.position);
 }
 
-	void shoot(){
-		var playerPos = _player.position;
-
+	void shoot(PositionComponent playerPos){
 		GameObject newBullet = GameObject.Instantiate(Resources.Load<GameObject>("Prefabs/Bullet"));
 		Entity e = _pool.CreateEntity();
 		e.isBullet = true;

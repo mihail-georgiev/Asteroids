@@ -1,16 +1,13 @@
 ﻿using Entitas;
 using UnityEngine;
+using System.Collections.Generic;
 
 public class RenderPositionSystem : IReactiveSystem {
-	public IMatcher GetTriggeringMatcher() {
-		return Matcher.AllOf(Matcher.GameObject, Matcher.Position);
-	}
+	public IMatcher trigger {get { return Matcher.AllOf(Matcher.GameObject, Matcher.Position);}}
 	
-	public GroupEventType GetEventType() {
-		return GroupEventType.OnEntityAdded;
-	}
+	public GroupEventType eventType {get{return GroupEventType.OnEntityAdded;}}
 	
-	public void Execute(Entity[] entities) {
+	public void Execute(List<Entity> entities) {
 		foreach (var e in entities) {
 			var pos = e.position;
 			if(e.hasGameObject) {

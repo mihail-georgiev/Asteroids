@@ -1,25 +1,15 @@
 ﻿using Entitas;
 using UnityEngine;
+using System.Collections.Generic;
 
-public class PlayerMoveSystem : IReactiveSystem, ISetPool {
-	Entity _player;
+public class PlayerMoveSystem : IReactiveSystem {
+	public IMatcher trigger {get { return Matcher.PlayerSpeed;} }
+	public GroupEventType eventType { get {	return GroupEventType.OnEntityAdded;}}
 
-	public void SetPool(Pool pool) {
-		_player = pool.playerEntity;
-	}
-
-	public IMatcher GetTriggeringMatcher() {
-		return Matcher.PlayerSpeed;
-	}
-	
-	public GroupEventType GetEventType() {
-		return GroupEventType.OnEntityAdded;
-	}
-	
-	public void Execute(Entity[] entities) {
-		var speed = entities.SingleEntity().playerSpeed;
-		var pos = getNewClampedPlayerPos(_player.position.x, _player.position.y, speed.speedX, speed.speedY);
-		_player.ReplacePosition(pos.x, pos.y);
+	public void Execute(List<Entity> entities) {
+		var player = entities.SingleEntity();
+		var pos = getNewClampedPlayerPos(player.position.x, player.position.y, player.playerSpeed.speedX, player.playerSpeed.speedY);
+		player.ReplacePosition(pos.x, pos.y);
 	}
 
 	Vector2 getNewClampedPlayerPos(float posX, float posY, float speedX, float speedY)	{

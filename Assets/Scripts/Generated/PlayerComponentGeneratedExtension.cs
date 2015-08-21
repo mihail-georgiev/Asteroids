@@ -14,6 +14,11 @@ namespace Entitas {
                 }
             }
         }
+
+        public Entity IsPlayer(bool value) {
+            isPlayer = value;
+            return this;
+        }
     }
 
     public partial class Pool {

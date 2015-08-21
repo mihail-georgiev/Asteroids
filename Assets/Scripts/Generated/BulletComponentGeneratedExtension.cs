@@ -14,6 +14,11 @@ namespace Entitas {
                 }
             }
         }
+
+        public Entity IsBullet(bool value) {
+            isBullet = value;
+            return this;
+        }
     }
 
     public partial class Matcher {
